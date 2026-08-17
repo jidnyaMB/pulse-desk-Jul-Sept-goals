@@ -18,6 +18,7 @@ describe('Auth (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Clean slate so this suite is repeatable against a persistent dev DB.
+    await prisma.patient.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
