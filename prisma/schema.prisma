@@ -16,6 +16,9 @@ model Tenant {
   users         User[]
   refreshTokens RefreshToken[]
   patients      Patient[]
+  careTeams     CareTeam[]
+  devices       Device[]
+  alerts        Alert[]
 
   @@map("tenants")
 }
