@@ -17,5 +17,17 @@ services:
       timeout: 5s
       retries: 10
 
+  openfga:
+    image: openfga/openfga:latest
+    container_name: pulsedesk-openfga
+    restart: unless-stopped
+    # In-memory datastore — dev/demo only. Data (store/model/tuples) is lost
+    # on restart. Production must point this at a persistent Postgres datastore.
+    command: run --datastore-engine memory
+    ports:
+      - "8080:8080" # HTTP API
+      - "8081:8081" # gRPC API
+      - "3002:3000" # Playground UI (host 3002 — 3000 is taken by the Nest API)
+
 volumes:
   pulsedesk_pg_data:

@@ -22,6 +22,11 @@ describe('Tenant isolation / RLS (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    await prisma.alert.deleteMany();
+    await prisma.device.deleteMany();
+    await prisma.careTeamPatient.deleteMany();
+    await prisma.careTeamMembership.deleteMany();
+    await prisma.careTeam.deleteMany();
     await prisma.patient.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();
@@ -56,6 +61,31 @@ describe('Tenant isolation / RLS (e2e)', () => {
       .post('/auth/login')
       .send({ tenantSlug: 'iso-tenant-a', email: 'doctor@iso-a.com', password: 'password123' });
     tenantAToken = login.body.accessToken;
+
+    // Phase 4: viewing a patient now requires care-team membership (OpenFGA),
+    // not just tenant membership — grant the doctor access to Patient A so
+    // the "own patient" test below reflects the intended post-Phase-4 behavior.
+    const authA = { Authorization: `Bearer ${tenantAToken}` };
+    const me = await request(app.getHttpServer()).get('/auth/me').set(authA);
+    const team = await request(app.getHttpServer())
+      .post('/care-teams')
+      .set(authA)
+      .send({ name: 'Iso Team A' });
+    await request(app.getHttpServer())
+      .post(`/care-teams/${team.body.id}/members`)
+      .set(authA)
+      .send({ userId: me.body.id });
+    await request(app.getHttpServer())
+      .post(`/care-teams/${team.body.id}/patients`)
+      .set(authA)
+      .send({ patientId: patientAId });
+
+    // Wait for the outbox relay (polls every ~500ms) to push the grant into OpenFGA.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const check = await request(app.getHttpServer()).get(`/patients/${patientAId}`).set(authA);
+      if (check.status === 200) break;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   });
 
   afterAll(async () => {

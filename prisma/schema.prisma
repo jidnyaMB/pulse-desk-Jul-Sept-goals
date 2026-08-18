@@ -59,10 +59,6 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// Minimal shape for now — this exists in Phase 2 solely so the mandatory
-// tenant-isolation/RLS test has a real tenant-scoped table to prove against.
-// Phase 3 adds the full CRUD surface (DTOs, care team relations, etc.) on top
-// of this same table; it does not change tenant_id/RLS semantics.
 model Patient {
   id        String    @id @default(uuid())
   tenantId  String    @map("tenant_id")
@@ -71,7 +67,103 @@ model Patient {
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  devices       Device[]
+  alerts        Alert[]
+  careTeamLinks CareTeamPatient[]
 
   @@map("patients")
+}
+
+model CareTeam {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant             @relation(fields: [tenantId], references: [id])
+  members CareTeamMembership[]
+  patients CareTeamPatient[]
+
+  @@map("care_teams")
+}
+
+// Which clinicians (users) belong to which care team.
+model CareTeamMembership {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  careTeamId String   @map("care_team_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  careTeam CareTeam @relation(fields: [careTeamId], references: [id])
+
+  @@unique([careTeamId, userId])
+  @@map("care_team_memberships")
+}
+
+// Which patients a care team covers. Many-to-many: a patient can have more
+// than one covering team, a team covers many patients.
+model CareTeamPatient {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  careTeamId String   @map("care_team_id")
+  patientId  String   @map("patient_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  careTeam CareTeam @relation(fields: [careTeamId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  @@unique([careTeamId, patientId])
+  @@map("care_team_patients")
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  patientId    String   @map("patient_id")
+  serialNumber String   @map("serial_number")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@unique([tenantId, serialNumber])
+  @@map("devices")
+}
+
+model Alert {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  patientId  String    @map("patient_id")
+  severity   String
+  message    String
+  status     String    @default("open")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@map("alerts")
+}
+
+// Outbox pattern: a Postgres write to care_team_memberships / care_team_patients
+// and the corresponding OpenFGA tuple write can't be one atomic transaction
+// across two different systems. So the intent to write/delete a tuple is
+// recorded here, in the SAME transaction as the Postgres change that caused
+// it — then a separate relay (OutboxRelayService) drains this table into
+// OpenFGA, retrying until it succeeds. Postgres stays the source of truth
+// even if OpenFGA is briefly unreachable.
+model OutboxEvent {
+  id           String    @id @default(uuid())
+  userObject   String    @map("user_object")
+  relation     String
+  targetObject String    @map("target_object")
+  operation    String // 'write' | 'delete'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  processedAt  DateTime? @map("processed_at")
+  lastError    String?   @map("last_error")
+
+  @@map("outbox_events")
 }
