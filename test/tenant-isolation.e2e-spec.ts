@@ -22,6 +22,11 @@ describe('Tenant isolation / RLS (e2e)', () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    await prisma.alert.deleteMany();
+    await prisma.device.deleteMany();
+    await prisma.careTeamPatient.deleteMany();
+    await prisma.careTeamMembership.deleteMany();
+    await prisma.careTeam.deleteMany();
     await prisma.patient.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();
