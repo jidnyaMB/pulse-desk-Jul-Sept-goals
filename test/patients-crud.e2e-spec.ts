@@ -46,6 +46,33 @@ describe('Patients CRUD (e2e)', () => {
 
   const auth = () => ({ Authorization: `Bearer ${token}` });
 
+  // Phase 4: viewing/editing a patient now requires care-team membership,
+  // not just being in the same tenant. Grants relay through the outbox into
+  // OpenFGA asynchronously (~500ms poll interval), so tests that need "can
+  // view/edit" retry briefly instead of asserting immediately after the grant.
+  async function grantEditorAccessAndWait(patientId: string) {
+    const me = await request(app.getHttpServer()).get('/auth/me').set(auth());
+    const team = await request(app.getHttpServer())
+      .post('/care-teams')
+      .set(auth())
+      .send({ name: `Team for ${patientId}` });
+    await request(app.getHttpServer())
+      .post(`/care-teams/${team.body.id}/members`)
+      .set(auth())
+      .send({ userId: me.body.id });
+    await request(app.getHttpServer())
+      .post(`/care-teams/${team.body.id}/patients`)
+      .set(auth())
+      .send({ patientId });
+
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const check = await request(app.getHttpServer()).get(`/patients/${patientId}`).set(auth());
+      if (check.status === 200) return;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    throw new Error('Timed out waiting for OpenFGA grant to relay via outbox');
+  }
+
   it('creates, lists, updates, and soft-deletes a patient', async () => {
     const create = await request(app.getHttpServer())
       .post('/patients')
@@ -57,6 +84,8 @@ describe('Patients CRUD (e2e)', () => {
     const list = await request(app.getHttpServer()).get('/patients').set(auth());
     expect(list.status).toBe(200);
     expect(list.body.some((p: { id: string }) => p.id === patientId)).toBe(true);
+
+    await grantEditorAccessAndWait(patientId);
 
     const update = await request(app.getHttpServer())
       .patch(`/patients/${patientId}`)

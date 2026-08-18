@@ -36,8 +36,14 @@ async function main() {
     `  curl -s -X POST localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"tenantSlug":"tenant-a","email":"doctor@tenant-a.com","password":"password123"}'`,
   );
   console.log(`\nTenant A doctor id: ${doctorA.id}`);
-  console.log(`Patient A (belongs to Tenant A) id: ${patientA.id}  -> GET should succeed (200)`);
-  console.log(`Patient B (belongs to Tenant B) id: ${patientB.id}  -> GET should 404`);
+  console.log(`Patient A (belongs to Tenant A) id: ${patientA.id}  -> GET should 404 initially`);
+  console.log(
+    '  (as of Phase 4, viewing needs care-team membership too — this patient has no team yet.',
+  );
+  console.log(
+    '   Create a care team, POST the doctor as a member, POST this patient into the team, then GET should return 200.)',
+  );
+  console.log(`Patient B (belongs to Tenant B) id: ${patientB.id}  -> GET should 404 (cross-tenant, always)`);
 }
 
 main()

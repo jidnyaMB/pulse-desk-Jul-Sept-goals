@@ -25,6 +25,18 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   REFRESH_TOKEN_TTL_DAYS: number;
+
+  @IsString()
+  @IsNotEmpty()
+  FGA_API_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  FGA_STORE_ID: string;
+
+  @IsString()
+  @IsNotEmpty()
+  FGA_MODEL_ID: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

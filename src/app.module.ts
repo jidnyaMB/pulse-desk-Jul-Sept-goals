@@ -8,6 +8,7 @@ import { CareTeamsModule } from './care-teams/care-teams.module';
 import { TenantContextInterceptor } from './common/tenant-context/tenant-context.interceptor';
 import { validateEnv } from './config/env.validation';
 import { DevicesModule } from './devices/devices.module';
+import { FgaModule } from './fga/fga.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
       middleware: { mount: true },
     }),
     PrismaModule,
+    FgaModule,
     UsersModule,
     TenantsModule,
     AuthModule,

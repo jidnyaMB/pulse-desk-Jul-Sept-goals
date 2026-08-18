@@ -46,8 +46,29 @@ export class CareTeamsService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findById(id);
+    const members = await this.listMembers(id);
+    const patients = await this.listPatients(id);
     await this.tenantDb.withTenant(async (tx) => {
+      for (const m of members) {
+        await tx.outboxEvent.create({
+          data: {
+            userObject: `user:${m.userId}`,
+            relation: 'member',
+            targetObject: `care_team:${id}`,
+            operation: 'delete',
+          },
+        });
+      }
+      for (const p of patients) {
+        await tx.outboxEvent.create({
+          data: {
+            userObject: `care_team:${id}`,
+            relation: 'care_team',
+            targetObject: `patient:${p.patientId}`,
+            operation: 'delete',
+          },
+        });
+      }
       await tx.careTeamMembership.deleteMany({ where: { careTeamId: id } });
       await tx.careTeamPatient.deleteMany({ where: { careTeamId: id } });
       await tx.careTeam.delete({ where: { id } });
@@ -61,21 +82,43 @@ export class CareTeamsService {
     );
   }
 
+  // Writes the CareTeamMembership row AND the outbox event that will relay
+  // "user:X member care_team:Y" into OpenFGA, in the same transaction — so
+  // either both happen or neither does. The relay drains outbox_events
+  // asynchronously; there's a brief window (normally well under a second)
+  // between this call returning and OpenFGA actually reflecting the grant.
   async addMember(careTeamId: string, dto: AddMemberDto) {
     await this.findById(careTeamId);
     const tenantId = this.cls.get('tenantId');
-    return this.tenantDb.withTenant((tx) =>
-      tx.careTeamMembership.create({
+    return this.tenantDb.withTenant(async (tx) => {
+      const membership = await tx.careTeamMembership.create({
         data: { tenantId: tenantId!, careTeamId, userId: dto.userId },
-      }),
-    );
+      });
+      await tx.outboxEvent.create({
+        data: {
+          userObject: `user:${dto.userId}`,
+          relation: 'member',
+          targetObject: `care_team:${careTeamId}`,
+          operation: 'write',
+        },
+      });
+      return membership;
+    });
   }
 
   async removeMember(careTeamId: string, userId: string): Promise<void> {
     await this.findById(careTeamId);
-    await this.tenantDb.withTenant((tx) =>
-      tx.careTeamMembership.deleteMany({ where: { careTeamId, userId } }),
-    );
+    await this.tenantDb.withTenant(async (tx) => {
+      await tx.careTeamMembership.deleteMany({ where: { careTeamId, userId } });
+      await tx.outboxEvent.create({
+        data: {
+          userObject: `user:${userId}`,
+          relation: 'member',
+          targetObject: `care_team:${careTeamId}`,
+          operation: 'delete',
+        },
+      });
+    });
   }
 
   async listPatients(careTeamId: string) {
@@ -88,17 +131,34 @@ export class CareTeamsService {
   async addPatient(careTeamId: string, dto: AddPatientDto) {
     await this.findById(careTeamId);
     const tenantId = this.cls.get('tenantId');
-    return this.tenantDb.withTenant((tx) =>
-      tx.careTeamPatient.create({
+    return this.tenantDb.withTenant(async (tx) => {
+      const link = await tx.careTeamPatient.create({
         data: { tenantId: tenantId!, careTeamId, patientId: dto.patientId },
-      }),
-    );
+      });
+      await tx.outboxEvent.create({
+        data: {
+          userObject: `care_team:${careTeamId}`,
+          relation: 'care_team',
+          targetObject: `patient:${dto.patientId}`,
+          operation: 'write',
+        },
+      });
+      return link;
+    });
   }
 
   async removePatient(careTeamId: string, patientId: string): Promise<void> {
     await this.findById(careTeamId);
-    await this.tenantDb.withTenant((tx) =>
-      tx.careTeamPatient.deleteMany({ where: { careTeamId, patientId } }),
-    );
+    await this.tenantDb.withTenant(async (tx) => {
+      await tx.careTeamPatient.deleteMany({ where: { careTeamId, patientId } });
+      await tx.outboxEvent.create({
+        data: {
+          userObject: `care_team:${careTeamId}`,
+          relation: 'care_team',
+          targetObject: `patient:${patientId}`,
+          operation: 'delete',
+        },
+      });
+    });
   }
 }

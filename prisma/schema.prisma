@@ -147,3 +147,23 @@ model Alert {
 
   @@map("alerts")
 }
+
+// Outbox pattern: a Postgres write to care_team_memberships / care_team_patients
+// and the corresponding OpenFGA tuple write can't be one atomic transaction
+// across two different systems. So the intent to write/delete a tuple is
+// recorded here, in the SAME transaction as the Postgres change that caused
+// it — then a separate relay (OutboxRelayService) drains this table into
+// OpenFGA, retrying until it succeeds. Postgres stays the source of truth
+// even if OpenFGA is briefly unreachable.
+model OutboxEvent {
+  id           String    @id @default(uuid())
+  userObject   String    @map("user_object")
+  relation     String
+  targetObject String    @map("target_object")
+  operation    String // 'write' | 'delete'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  processedAt  DateTime? @map("processed_at")
+  lastError    String?   @map("last_error")
+
+  @@map("outbox_events")
+}
