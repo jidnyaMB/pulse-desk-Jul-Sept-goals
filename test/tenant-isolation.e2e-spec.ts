@@ -27,6 +27,7 @@ describe('Tenant isolation / RLS (e2e)', () => {
     await prisma.careTeamPatient.deleteMany();
     await prisma.careTeamMembership.deleteMany();
     await prisma.careTeam.deleteMany();
+    await prisma.accessGrant.deleteMany();
     await prisma.patient.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();

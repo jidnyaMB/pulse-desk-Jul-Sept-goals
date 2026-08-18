@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
+import { AccessGrantsService } from '../access-grants/access-grants.service';
 import { AppClsStore } from '../common/cls/app-cls-store.interface';
 import { FgaService } from '../fga/fga.service';
 import { TenantDbService } from '../prisma/tenant-db.service';
@@ -12,6 +13,7 @@ export class PatientsService {
     private readonly tenantDb: TenantDbService,
     private readonly cls: ClsService<AppClsStore>,
     private readonly fgaService: FgaService,
+    private readonly accessGrantsService: AccessGrantsService,
   ) {}
 
   create(dto: CreatePatientDto) {
@@ -57,8 +59,18 @@ export class PatientsService {
   }
 
   private async assertPermission(patientId: string, relation: 'viewer' | 'editor') {
-    const userId = this.cls.get('userId');
-    const allowed = await this.fgaService.check(userId!, relation, 'patient', patientId);
+    const userId = this.cls.get('userId')!;
+    const contextualTuples = await this.accessGrantsService.getValidContextualTuples(
+      userId,
+      patientId,
+    );
+    const allowed = await this.fgaService.check(
+      userId,
+      relation,
+      'patient',
+      patientId,
+      contextualTuples,
+    );
     if (!allowed) {
       throw new ForbiddenException();
     }

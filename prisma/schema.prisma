@@ -19,6 +19,7 @@ model Tenant {
   careTeams     CareTeam[]
   devices       Device[]
   alerts        Alert[]
+  accessGrants  AccessGrant[]
 
   @@map("tenants")
 }
@@ -67,10 +68,11 @@ model Patient {
   createdAt DateTime  @default(now()) @map("created_at")
   deletedAt DateTime? @map("deleted_at")
 
-  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
   devices       Device[]
   alerts        Alert[]
   careTeamLinks CareTeamPatient[]
+  accessGrants  AccessGrant[]
 
   @@map("patients")
 }
@@ -166,4 +168,43 @@ model OutboxEvent {
   lastError    String?   @map("last_error")
 
   @@map("outbox_events")
+}
+
+// Temporary access, expressed as a plain Postgres row rather than a stored
+// OpenFGA tuple. Expiry/revocation is exact and instant because it's a
+// database timestamp comparison, not something OpenFGA has to know about
+// persistently — see AccessGrantsService.getValidContextualTuples(), which
+// turns currently-valid rows into contextual tuples at check time only.
+model AccessGrant {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  userId        String    @map("user_id")
+  patientId     String    @map("patient_id")
+  relation      String // 'viewer' | 'editor'
+  reason        String // e.g. 'on_call', 'break_glass'
+  justification String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@map("access_grants")
+}
+
+// Minimal audit trail — only what Phase 4's break-glass requirement needs.
+// Phase 6 formalizes this (trace_id, request_id, structured authorization
+// decision/reason columns). No patient name/MRN/reading values here, ever.
+model AuditLog {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  actorUserId  String   @map("actor_user_id")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
 }

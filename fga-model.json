@@ -25,16 +25,36 @@
         "care_team": {
           "this": {}
         },
+        "granted_viewer": {
+          "this": {}
+        },
+        "granted_editor": {
+          "this": {}
+        },
         "viewer": {
-          "tupleToUserset": {
-            "tupleset": { "relation": "care_team" },
-            "computedUserset": { "relation": "member" }
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": { "relation": "care_team" },
+                  "computedUserset": { "relation": "member" }
+                }
+              },
+              { "computedUserset": { "relation": "granted_viewer" } }
+            ]
           }
         },
         "editor": {
-          "tupleToUserset": {
-            "tupleset": { "relation": "care_team" },
-            "computedUserset": { "relation": "member" }
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": { "relation": "care_team" },
+                  "computedUserset": { "relation": "member" }
+                }
+              },
+              { "computedUserset": { "relation": "granted_editor" } }
+            ]
           }
         }
       },
@@ -42,6 +62,12 @@
         "relations": {
           "care_team": {
             "directly_related_user_types": [{ "type": "care_team" }]
+          },
+          "granted_viewer": {
+            "directly_related_user_types": [{ "type": "user" }]
+          },
+          "granted_editor": {
+            "directly_related_user_types": [{ "type": "user" }]
           },
           "viewer": {
             "directly_related_user_types": []

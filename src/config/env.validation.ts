@@ -37,6 +37,10 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   FGA_MODEL_ID: string;
+
+  @IsInt()
+  @Min(1)
+  BREAK_GLASS_TTL_HOURS: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

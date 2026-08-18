@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenFgaClient } from '@openfga/sdk';
 
+export interface ContextualTuple {
+  user: string;
+  relation: string;
+  object: string;
+}
+
 @Injectable()
 export class FgaService {
   private readonly client: OpenFgaClient;
@@ -14,11 +20,23 @@ export class FgaService {
     });
   }
 
-  async check(userId: string, relation: string, objectType: string, objectId: string): Promise<boolean> {
+  // contextualTuples exist ONLY for the duration of this single check call —
+  // they're never persisted in the OpenFGA store. That's what makes
+  // time-bounded access grants work: we hand OpenFGA a tuple representing
+  // "user:X granted_viewer patient:Y" only when Postgres currently says that
+  // grant is valid (not expired, not revoked), decided fresh on every check.
+  async check(
+    userId: string,
+    relation: string,
+    objectType: string,
+    objectId: string,
+    contextualTuples: ContextualTuple[] = [],
+  ): Promise<boolean> {
     const result = await this.client.check({
       user: `user:${userId}`,
       relation,
       object: `${objectType}:${objectId}`,
+      ...(contextualTuples.length > 0 ? { contextualTuples } : {}),
     });
     return result.allowed ?? false;
   }
