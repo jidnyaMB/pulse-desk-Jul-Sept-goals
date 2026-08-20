@@ -19,6 +19,8 @@ describe('Patients CRUD (e2e)', () => {
     prisma = app.get(PrismaService);
 
     await prisma.alert.deleteMany();
+    await prisma.reading.deleteMany();
+    await prisma.webhookEvent.deleteMany();
     await prisma.device.deleteMany();
     await prisma.careTeamPatient.deleteMany();
     await prisma.careTeamMembership.deleteMany();

@@ -11,8 +11,10 @@ import { DevicesModule } from './devices/devices.module';
 import { FgaModule } from './fga/fga.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { QueueModule } from './queue/queue.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { UsersModule } from './users/users.module';
     }),
     PrismaModule,
     FgaModule,
+    QueueModule,
     UsersModule,
     TenantsModule,
     AuthModule,
@@ -33,6 +36,7 @@ import { UsersModule } from './users/users.module';
     CareTeamsModule,
     DevicesModule,
     AlertsModule,
+    WebhooksModule,
   ],
   providers: [
     {

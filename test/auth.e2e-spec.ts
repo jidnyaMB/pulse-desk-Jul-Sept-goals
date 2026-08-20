@@ -20,6 +20,8 @@ describe('Auth (e2e)', () => {
     // Clean slate so this suite is repeatable against a persistent dev DB.
     // Order matters: child tables (FK to patients/tenants) before parents.
     await prisma.alert.deleteMany();
+    await prisma.reading.deleteMany();
+    await prisma.webhookEvent.deleteMany();
     await prisma.device.deleteMany();
     await prisma.careTeamPatient.deleteMany();
     await prisma.careTeamMembership.deleteMany();

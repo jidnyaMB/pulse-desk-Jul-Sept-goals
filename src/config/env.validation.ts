@@ -41,6 +41,18 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   BREAK_GLASS_TTL_HOURS: number;
+
+  @IsString()
+  @IsNotEmpty()
+  REDIS_URL: string;
+
+  @IsInt()
+  @Min(1)
+  HEART_RATE_ALERT_THRESHOLD: number;
+
+  @IsInt()
+  @Min(1)
+  HEART_RATE_WINDOW_MINUTES: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

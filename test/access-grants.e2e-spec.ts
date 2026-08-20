@@ -23,6 +23,8 @@ describe('Access grants & break-glass (e2e)', () => {
     await prisma.auditLog.deleteMany();
     await prisma.accessGrant.deleteMany();
     await prisma.alert.deleteMany();
+    await prisma.reading.deleteMany();
+    await prisma.webhookEvent.deleteMany();
     await prisma.device.deleteMany();
     await prisma.careTeamPatient.deleteMany();
     await prisma.careTeamMembership.deleteMany();

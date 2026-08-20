@@ -20,6 +20,8 @@ model Tenant {
   devices       Device[]
   alerts        Alert[]
   accessGrants  AccessGrant[]
+  webhookEvents WebhookEvent[]
+  readings      Reading[]
 
   @@map("tenants")
 }
@@ -73,6 +75,7 @@ model Patient {
   alerts        Alert[]
   careTeamLinks CareTeamPatient[]
   accessGrants  AccessGrant[]
+  readings      Reading[]
 
   @@map("patients")
 }
@@ -124,14 +127,61 @@ model Device {
   id           String   @id @default(uuid())
   tenantId     String   @map("tenant_id")
   patientId    String   @map("patient_id")
-  serialNumber String   @map("serial_number")
+  // Globally unique (not per-tenant): a device webhook arrives with only a
+  // serial number and a signature, before we know which tenant it belongs
+  // to — the serial number IS how we resolve the tenant, so it has to be
+  // unambiguous across the whole system, the way real device serials are.
+  serialNumber String   @unique @map("serial_number")
+  // Per-device HMAC secret used to verify webhook signatures. Generated
+  // once at device creation, returned in that response only — never
+  // included in subsequent GET/list responses.
+  hmacSecret   String   @map("hmac_secret")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  patient Patient @relation(fields: [patientId], references: [id])
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  patient  Patient        @relation(fields: [patientId], references: [id])
+  webhooks WebhookEvent[]
+  readings Reading[]
 
-  @@unique([tenantId, serialNumber])
   @@map("devices")
+}
+
+model WebhookEvent {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  deviceId       String    @map("device_id")
+  externalEventId String   @map("external_event_id")
+  payload        Json
+  createdAt      DateTime  @default(now()) @map("created_at")
+  processedAt    DateTime? @map("processed_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  device  Device   @relation(fields: [deviceId], references: [id])
+  reading Reading?
+
+  // The actual idempotency boundary: two webhook deliveries with the same
+  // (deviceId, externalEventId) can never both succeed at INSERT time, no
+  // matter how many times the vendor retries or how many requests race.
+  @@unique([deviceId, externalEventId])
+  @@map("webhook_events")
+}
+
+model Reading {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  patientId      String   @map("patient_id")
+  deviceId       String   @map("device_id")
+  webhookEventId String   @unique @map("webhook_event_id")
+  heartRate      Int      @map("heart_rate")
+  recordedAt     DateTime @map("recorded_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  patient      Patient      @relation(fields: [patientId], references: [id])
+  device       Device       @relation(fields: [deviceId], references: [id])
+  webhookEvent WebhookEvent @relation(fields: [webhookEventId], references: [id])
+
+  @@map("readings")
 }
 
 model Alert {
@@ -141,6 +191,12 @@ model Alert {
   severity   String
   message    String
   status     String    @default("open")
+  // Identifies WHAT kind of condition triggered this alert (e.g.
+  // 'high_heart_rate'). Combined with a partial unique index (see the
+  // alert_dedupe_partial_index migration) on (patientId, dedupeKey) WHERE
+  // status = 'open', this makes "don't open a second alert for a condition
+  // that's already open" a database guarantee, not an application check.
+  dedupeKey  String?   @map("dedupe_key")
   createdAt  DateTime  @default(now()) @map("created_at")
   resolvedAt DateTime? @map("resolved_at")
 
@@ -207,4 +263,18 @@ model AuditLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+}
+
+// Proof artifact for cluster-safe scheduling: the scheduled sweep job writes
+// exactly one row per tick (tickKey = the tick's timestamp, truncated to the
+// minute). If N worker replicas were each running their own timer instead of
+// sharing one BullMQ repeatable job, you'd see N rows per tick instead of 1 —
+// that's the actual, checkable difference this table exists to prove.
+model ScheduledJobRun {
+  id       String   @id @default(uuid())
+  tickKey  String   @unique @map("tick_key")
+  runAt    DateTime @default(now()) @map("run_at")
+  runByPid Int      @map("run_by_pid")
+
+  @@map("scheduled_job_runs")
 }

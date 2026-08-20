@@ -33,7 +33,7 @@ async function main() {
   console.log('Seed complete.\n');
   console.log('Login as the Tenant A doctor:');
   console.log(
-    `  curl -s -X POST localhost:3000/auth/login -H 'Content-Type: application/json' -d '{"tenantSlug":"tenant-a","email":"doctor@tenant-a.com","password":"password123"}'`,
+    `  curl -s -X POST localhost:3001/auth/login -H 'Content-Type: application/json' -d '{"tenantSlug":"tenant-a","email":"doctor@tenant-a.com","password":"password123"}'`,
   );
   console.log(`\nTenant A doctor id: ${doctorA.id}`);
   console.log(`Patient A (belongs to Tenant A) id: ${patientA.id}  -> GET should 403 initially`);
