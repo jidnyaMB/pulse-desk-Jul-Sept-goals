@@ -30,10 +30,13 @@ describe('OpenFGA relationship authorization (e2e)', () => {
     prisma = app.get(PrismaService);
 
     await prisma.alert.deleteMany();
+    await prisma.reading.deleteMany();
+    await prisma.webhookEvent.deleteMany();
     await prisma.device.deleteMany();
     await prisma.careTeamPatient.deleteMany();
     await prisma.careTeamMembership.deleteMany();
     await prisma.careTeam.deleteMany();
+    await prisma.accessGrant.deleteMany();
     await prisma.patient.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.user.deleteMany();
